@@ -62,19 +62,31 @@ def test_vq_mask():
     assert (mask_quantized[:, 512:] == 0.).all()
     assert (mask_indices[:, 512:] == -1).all()
 
-def test_residual_vq():
+@pytest.mark.parametrize('implicit_neural_codebook', (True, False))
+@pytest.mark.parametrize('use_cosine_sim', (True, False))
+@pytest.mark.parametrize('train', (True, False))
+def test_residual_vq(
+    implicit_neural_codebook,
+    use_cosine_sim,
+    train
+):
     from vector_quantize_pytorch import ResidualVQ
 
     residual_vq = ResidualVQ(
-        dim = 256,
-        num_quantizers = 8,      # specify number of quantizers
-        codebook_size = 1024,    # codebook size
+        dim = 32,
+        num_quantizers = 8,
+        codebook_size = 128,
+        implicit_neural_codebook = implicit_neural_codebook,
+        use_cosine_sim = use_cosine_sim,
     )
 
-    x = torch.randn(1, 1024, 256)
+    x = torch.randn(1, 256, 32)
 
-    quantized, indices, commit_loss = residual_vq(x)
-    quantized, indices, commit_loss, all_codes = residual_vq(x, return_all_codes = True)
+    residual_vq.train(train)
+
+    quantized, indices, commit_loss = residual_vq(x, freeze_codebook = train and not implicit_neural_codebook)
+    quantized_out = residual_vq.get_output_from_indices(indices)
+    assert torch.allclose(quantized, quantized_out, atol = 1e-6)
 
 def test_residual_vq2():
     from vector_quantize_pytorch import ResidualVQ
@@ -90,7 +102,6 @@ def test_residual_vq2():
 
     x = torch.randn(1, 1024, 256)
     quantized, indices, commit_loss = residual_vq(x)
-
 
 def test_grouped_residual_vq():
     from vector_quantize_pytorch import GroupedResidualVQ
